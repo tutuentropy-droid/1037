@@ -79,13 +79,24 @@ export function StatsPanel() {
       layabout: 0,
     };
     residents.forEach(r => {
-      counts[r.personality.type]++;
+      const type = r.personality?.type;
+      if (type && counts[type] !== undefined) {
+        counts[type]++;
+      }
     });
     return counts;
   }, [state]);
 
   const formattedStats = useMemo(() => {
     if (!stats) return null;
+    const housing = stats.housing || {
+      avgHousePrice: 0,
+      avgRent: 0,
+      vacancyRate: 0,
+      homeownershipRate: 0,
+      totalHouses: 0,
+      priceChange: 0,
+    };
 
     const formatNumber = (num: number) => {
       if (num >= 1000000) {
@@ -124,15 +135,15 @@ export function StatsPanel() {
       },
       {
         title: '平均房价',
-        value: `¥${formatNumber(stats.housing.avgHousePrice)}`,
-        change: stats.housing.priceChange,
+        value: `¥${formatNumber(housing.avgHousePrice)}`,
+        change: housing.priceChange,
         icon: <Home className="w-5 h-5 text-violet-400" />,
         color: 'text-violet-400',
         bgColor: 'bg-slate-800/50 border-violet-500/30',
       },
       {
         title: '房屋空置率',
-        value: `${(stats.housing.vacancyRate * 100).toFixed(1)}%`,
+        value: `${(housing.vacancyRate * 100).toFixed(1)}%`,
         change: 0,
         icon: <Building2 className="w-5 h-5 text-orange-400" />,
         color: 'text-orange-400',
@@ -195,19 +206,19 @@ export function StatsPanel() {
           <div>
             <div className="text-xs text-gray-500">平均租金</div>
             <div className="text-sm font-bold text-white tabular-nums" style={{ fontFamily: "'VT323', monospace" }}>
-              ¥{stats?.housing?.avgRent ? stats.housing.avgRent.toFixed(0) : '0'}
+              ¥{stats.housing?.avgRent ? stats.housing.avgRent.toFixed(0) : '0'}
             </div>
           </div>
           <div>
             <div className="text-xs text-gray-500">住房拥有率</div>
             <div className="text-sm font-bold text-white tabular-nums" style={{ fontFamily: "'VT323', monospace" }}>
-              {stats?.housing ? (stats.housing.homeownershipRate * 100).toFixed(1) : '0'}%
+              {stats.housing ? (stats.housing.homeownershipRate * 100).toFixed(1) : '0'}%
             </div>
           </div>
           <div>
             <div className="text-xs text-gray-500">房屋总数</div>
             <div className="text-sm font-bold text-white tabular-nums" style={{ fontFamily: "'VT323', monospace" }}>
-              {stats?.housing?.totalHouses || 0} 套
+              {stats.housing?.totalHouses || 0} 套
             </div>
           </div>
           <div>

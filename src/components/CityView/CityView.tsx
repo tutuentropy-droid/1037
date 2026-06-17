@@ -5,6 +5,19 @@ import { GAME_CONFIG } from '@shared/index';
 import { Building2, ShoppingBag, User, Home } from 'lucide-react';
 import './CityView.css';
 
+const DEFAULT_POSITION = { x: 0, y: 0 };
+
+function normalizePosition(position?: { x: number; y: number } | null) {
+  if (
+    position &&
+    Number.isFinite(position.x) &&
+    Number.isFinite(position.y)
+  ) {
+    return position;
+  }
+  return DEFAULT_POSITION;
+}
+
 interface EntityTileProps {
   entity: Entity;
   isSelected: boolean;
@@ -29,8 +42,10 @@ function HouseTile({ house, isSelected, onClick }: { house: House; isSelected: b
 
   const getTitle = () => {
     const statusText = house.status === 'owned' ? '自有' : house.status === 'rented' ? '租住' : '空置';
-    return `${house.name} [${statusText}] ¥${house.price.toFixed(0)}`;
+    return `${house.name} [${statusText}] ¥${(house.price || 0).toFixed(0)}`;
   };
+
+  const position = normalizePosition(house.position);
 
   return (
     <div
@@ -44,8 +59,8 @@ function HouseTile({ house, isSelected, onClick }: { house: House; isSelected: b
       style={{
         width: '28px',
         height: '28px',
-        left: `${house.position.x * 40 + 6}px`,
-        top: `${house.position.y * 40 + 6}px`,
+        left: `${position.x * 40 + 6}px`,
+        top: `${position.y * 40 + 6}px`,
       }}
       onClick={onClick}
       title={getTitle()}
@@ -66,9 +81,21 @@ function ResidentAvatar({
   onClick: () => void;
   prosperityLevel: number;
 }) {
-  const [displayPos, setDisplayPos] = useState({ ...resident.homePosition });
+  const homePosition = useMemo(
+    () => normalizePosition(resident.homePosition || resident.position),
+    [resident.homePosition, resident.position]
+  );
+  const currentPosition = useMemo(
+    () => normalizePosition(resident.position || resident.homePosition),
+    [resident.position, resident.homePosition]
+  );
+  const [displayPos, setDisplayPos] = useState(homePosition);
   const animationRef = useRef<number>();
   const lastUpdateRef = useRef<number>(Date.now());
+
+  useEffect(() => {
+    setDisplayPos(homePosition);
+  }, [homePosition]);
 
   useEffect(() => {
     const animate = () => {
@@ -77,28 +104,28 @@ function ResidentAvatar({
       lastUpdateRef.current = now;
 
       setDisplayPos(prev => {
-        let target = { ...resident.homePosition };
+        let target = { ...homePosition };
         
         if (resident.employed) {
           const cycle = (now / 1000) % 8;
           if (cycle < 3) {
-            target = { ...resident.homePosition };
+            target = { ...homePosition };
           } else if (cycle < 6) {
             if (resident.employerId) {
-              target = { x: resident.position.x + (Math.random() - 0.5) * 0.5, y: resident.position.y + (Math.random() - 0.5) * 0.5 };
+              target = { x: currentPosition.x + (Math.random() - 0.5) * 0.5, y: currentPosition.y + (Math.random() - 0.5) * 0.5 };
             } else {
-              target = { ...resident.position };
+              target = { ...currentPosition };
             }
           } else {
-            target = { x: resident.position.x + (Math.random() - 0.5) * 2, y: resident.position.y + (Math.random() - 0.5) * 2 };
+            target = { x: currentPosition.x + (Math.random() - 0.5) * 2, y: currentPosition.y + (Math.random() - 0.5) * 2 };
           }
         } else {
-          target = { ...resident.homePosition };
+          target = { ...homePosition };
           const idleWander = (now / 1000) % 10;
           if (idleWander > 5) {
             target = {
-              x: resident.homePosition.x + Math.sin(now / 2000 + resident.id.charCodeAt(0)) * 0.5,
-              y: resident.homePosition.y + Math.cos(now / 2000 + resident.id.charCodeAt(1)) * 0.5,
+              x: homePosition.x + Math.sin(now / 2000 + resident.id.charCodeAt(0)) * 0.5,
+              y: homePosition.y + Math.cos(now / 2000 + resident.id.charCodeAt(1)) * 0.5,
             };
           }
         }
@@ -129,13 +156,13 @@ function ResidentAvatar({
         cancelAnimationFrame(animationRef.current);
       }
     };
-  }, [resident, prosperityLevel]);
+  }, [resident, prosperityLevel, homePosition, currentPosition]);
 
   const getEntityColor = () => {
     const baseColor = resident.employed ? 'bg-emerald-500/70' : 'bg-rose-500/70';
     let borderColor = 'border-emerald-400';
     
-    switch (resident.personality.type) {
+    switch (resident.personality?.type) {
       case 'frugal':
         borderColor = resident.employed ? 'border-emerald-300' : 'border-emerald-600';
         break;
@@ -155,7 +182,7 @@ function ResidentAvatar({
   const getTitle = () => {
     const status = resident.employed ? '工作中' : '失业';
     const activity = !resident.employed ? '（在家）' : '';
-    return `${resident.name} [${resident.personality.label}] ${status}${activity}`;
+    return `${resident.name} [${resident.personality?.label || '居民'}] ${status}${activity}`;
   };
 
   return (
@@ -221,6 +248,8 @@ function EntityTile({ entity, isSelected, onClick, prosperityLevel }: EntityTile
     return entity.name;
   };
 
+  const position = normalizePosition(entity.position);
+
   return (
     <div
       className={`
@@ -233,8 +262,8 @@ function EntityTile({ entity, isSelected, onClick, prosperityLevel }: EntityTile
       style={{
         width: '32px',
         height: '32px',
-        left: `${entity.position.x * 40 + 4}px`,
-        top: `${entity.position.y * 40 + 4}px`,
+        left: `${position.x * 40 + 4}px`,
+        top: `${position.y * 40 + 4}px`,
       }}
       onClick={onClick}
       title={getTitle()}

@@ -3,6 +3,16 @@ import type { ResidentHistoryEntry } from '@shared/index';
 import { X, Building2, ShoppingBag, User, Briefcase, Wallet, TrendingUp, Users, Heart, PiggyBank, CreditCard, Home, Smile, Frown, Meh, Activity, Building } from 'lucide-react';
 import './EntityDetail.css';
 
+const fallbackPosition = { x: 0, y: 0 };
+
+function formatMoney(value: number | undefined | null) {
+  return (value || 0).toFixed(0).toLocaleString();
+}
+
+function formatNumber(value: number | undefined | null) {
+  return value || 0;
+}
+
 export function EntityDetail() {
   const selectedEntity = useGameStore(state => state.selectedEntity);
   const setSelectedEntity = useGameStore(state => state.setSelectedEntity);
@@ -120,10 +130,10 @@ export function EntityDetail() {
                 <Heart className="w-4 h-4" />
                 人格类型
               </div>
-              <div className={`text-lg font-bold ${selectedEntity.personality.color}`}>
-                {selectedEntity.personality.label}
+              <div className={`text-lg font-bold ${selectedEntity.personality?.color || 'text-emerald-400'}`}>
+                {selectedEntity.personality?.label || '普通居民'}
               </div>
-              <p className="text-xs text-gray-500 mt-1">{selectedEntity.personality.description}</p>
+              <p className="text-xs text-gray-500 mt-1">{selectedEntity.personality?.description || '暂无人格描述'}</p>
             </div>
 
             <div className="p-3 bg-slate-800/50 rounded-lg border border-slate-700">
@@ -146,33 +156,33 @@ export function EntityDetail() {
                   <span className="text-gray-400 flex items-center gap-1">
                     <TrendingUp className="w-3 h-3" /> 月收入
                   </span>
-                  <span className="text-white font-mono">¥{selectedEntity.income.toLocaleString()}</span>
+                  <span className="text-white font-mono">¥{formatMoney(selectedEntity.income)}</span>
                 </div>
                 <div className="flex justify-between items-center">
                   <span className="text-gray-400 flex items-center gap-1">
                     <PiggyBank className="w-3 h-3" /> 储蓄
                   </span>
-                  <span className="text-amber-400 font-mono">¥{selectedEntity.savings.toFixed(0).toLocaleString()}</span>
+                  <span className="text-amber-400 font-mono">¥{formatMoney(selectedEntity.savings)}</span>
                 </div>
                 <div className="flex justify-between items-center">
                   <span className="text-gray-400 flex items-center gap-1">
                     <CreditCard className="w-3 h-3" /> 债务
                   </span>
-                  <span className={`font-mono ${selectedEntity.debt > 0 ? 'text-rose-400' : 'text-gray-500'}`}>
-                    ¥{selectedEntity.debt.toFixed(0).toLocaleString()}
+                  <span className={`font-mono ${formatNumber(selectedEntity.debt) > 0 ? 'text-rose-400' : 'text-gray-500'}`}>
+                    ¥{formatMoney(selectedEntity.debt)}
                   </span>
                 </div>
                 <div className="flex justify-between items-center">
                   <span className="text-gray-400 flex items-center gap-1">
                     <Home className="w-3 h-3" /> 资产
                   </span>
-                  <span className="text-purple-400 font-mono">¥{selectedEntity.assets.toFixed(0).toLocaleString()}</span>
+                  <span className="text-purple-400 font-mono">¥{formatMoney(selectedEntity.assets)}</span>
                 </div>
                 <div className="flex justify-between items-center pt-2 border-t border-slate-700">
                   <span className="text-gray-400 flex items-center gap-1">
                     <ShoppingBag className="w-3 h-3" /> 日消费
                   </span>
-                  <span className="text-cyan-400 font-mono">¥{selectedEntity.consumption.toFixed(0).toLocaleString()}</span>
+                  <span className="text-cyan-400 font-mono">¥{formatMoney(selectedEntity.consumption)}</span>
                 </div>
               </div>
             </div>
@@ -186,23 +196,23 @@ export function EntityDetail() {
                 <div className="flex-1 h-3 bg-slate-700 rounded-full overflow-hidden">
                   <div 
                     className={`h-full rounded-full transition-all duration-500 ${
-                      selectedEntity.mood >= 70 ? 'bg-emerald-500' :
-                      selectedEntity.mood >= 40 ? 'bg-amber-500' : 'bg-rose-500'
+                      formatNumber(selectedEntity.mood) >= 70 ? 'bg-emerald-500' :
+                      formatNumber(selectedEntity.mood) >= 40 ? 'bg-amber-500' : 'bg-rose-500'
                     }`}
-                    style={{ width: `${selectedEntity.mood}%` }}
+                    style={{ width: `${formatNumber(selectedEntity.mood)}%` }}
                   />
                 </div>
                 <span className={`font-bold text-sm ${
-                  selectedEntity.mood >= 70 ? 'text-emerald-400' :
-                  selectedEntity.mood >= 40 ? 'text-amber-400' : 'text-rose-400'
+                  formatNumber(selectedEntity.mood) >= 70 ? 'text-emerald-400' :
+                  formatNumber(selectedEntity.mood) >= 40 ? 'text-amber-400' : 'text-rose-400'
                 }`}>
-                  {selectedEntity.mood.toFixed(0)}
+                  {formatNumber(selectedEntity.mood).toFixed(0)}
                 </span>
               </div>
-              <p className="text-xs text-gray-500 mt-1">{getMoodLabel(selectedEntity.mood)}</p>
+              <p className="text-xs text-gray-500 mt-1">{getMoodLabel(formatNumber(selectedEntity.mood))}</p>
             </div>
 
-            {selectedEntity.history.length > 0 && (
+            {(selectedEntity.history?.length || 0) > 0 && (
               <div className="p-3 bg-slate-800/50 rounded-lg border border-slate-700">
                 <div className="flex items-center gap-2 text-gray-400 text-sm mb-3">
                   <Activity className="w-4 h-4" />
@@ -215,7 +225,7 @@ export function EntityDetail() {
               </div>
             )}
 
-            {selectedEntity.history.some(h => h.event) && (
+            {selectedEntity.history?.some(h => h.event) && (
               <div className="p-3 bg-slate-800/50 rounded-lg border border-slate-700">
                 <div className="text-gray-400 text-sm mb-2">📝 重要事件</div>
                 <div className="space-y-1 max-h-32 overflow-y-auto">
@@ -241,16 +251,16 @@ export function EntityDetail() {
               <div className="space-y-2">
                 <div className="flex justify-between">
                   <span className="text-gray-400">营业收入</span>
-                  <span className="text-emerald-400 font-mono">¥{selectedEntity.revenue.toFixed(0).toLocaleString()}</span>
+                  <span className="text-emerald-400 font-mono">¥{formatMoney(selectedEntity.revenue)}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-gray-400">运营支出</span>
-                  <span className="text-rose-400 font-mono">¥{selectedEntity.expenses.toFixed(0).toLocaleString()}</span>
+                  <span className="text-rose-400 font-mono">¥{formatMoney(selectedEntity.expenses)}</span>
                 </div>
                 <div className="flex justify-between pt-2 border-t border-slate-700">
                   <span className="text-gray-400">净利润</span>
-                  <span className={`font-mono font-bold ${selectedEntity.revenue - selectedEntity.expenses >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
-                    ¥{(selectedEntity.revenue - selectedEntity.expenses).toFixed(0).toLocaleString()}
+                  <span className={`font-mono font-bold ${formatNumber(selectedEntity.revenue) - formatNumber(selectedEntity.expenses) >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
+                    ¥{formatMoney(formatNumber(selectedEntity.revenue) - formatNumber(selectedEntity.expenses))}
                   </span>
                 </div>
               </div>
@@ -264,11 +274,11 @@ export function EntityDetail() {
               <div className="space-y-2">
                 <div className="flex justify-between">
                   <span className="text-gray-400">库存量</span>
-                  <span className="text-white font-mono">{selectedEntity.inventory.toFixed(0)} 件</span>
+                  <span className="text-white font-mono">{formatNumber(selectedEntity.inventory).toFixed(0)} 件</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-gray-400">价格水平</span>
-                  <span className="text-orange-400 font-mono">{selectedEntity.priceLevel.toFixed(2)}x</span>
+                  <span className="text-orange-400 font-mono">{formatNumber(selectedEntity.priceLevel).toFixed(2)}x</span>
                 </div>
               </div>
             </div>
@@ -295,16 +305,16 @@ export function EntityDetail() {
               <div className="space-y-2">
                 <div className="flex justify-between">
                   <span className="text-gray-400">营业收入</span>
-                  <span className="text-emerald-400 font-mono">¥{selectedEntity.revenue.toFixed(0).toLocaleString()}</span>
+                  <span className="text-emerald-400 font-mono">¥{formatMoney(selectedEntity.revenue)}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-gray-400">工资支出</span>
-                  <span className="text-rose-400 font-mono">¥{selectedEntity.expenses.toFixed(0).toLocaleString()}</span>
+                  <span className="text-rose-400 font-mono">¥{formatMoney(selectedEntity.expenses)}</span>
                 </div>
                 <div className="flex justify-between pt-2 border-t border-slate-700">
                   <span className="text-gray-400">净利润</span>
-                  <span className={`font-mono font-bold ${selectedEntity.revenue - selectedEntity.expenses >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
-                    ¥{(selectedEntity.revenue - selectedEntity.expenses).toFixed(0).toLocaleString()}
+                  <span className={`font-mono font-bold ${formatNumber(selectedEntity.revenue) - formatNumber(selectedEntity.expenses) >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
+                    ¥{formatMoney(formatNumber(selectedEntity.revenue) - formatNumber(selectedEntity.expenses))}
                   </span>
                 </div>
               </div>
@@ -316,7 +326,7 @@ export function EntityDetail() {
                 生产能力
               </div>
               <div className="text-xl font-bold text-cyan-400">
-                日产量 ¥{selectedEntity.production.toFixed(0).toLocaleString()}
+                日产量 ¥{formatMoney(selectedEntity.production)}
               </div>
             </div>
 
@@ -330,7 +340,7 @@ export function EntityDetail() {
                   {selectedEntity.landHoldings} 套房产
                 </div>
                 <div className="text-xs text-gray-500 mt-1">
-                  估值 ¥{selectedEntity.landValue?.toFixed(0).toLocaleString() || '0'}
+                  估值 ¥{formatMoney(selectedEntity.landValue)}
                 </div>
               </div>
             )}
@@ -370,13 +380,13 @@ export function EntityDetail() {
                 <div className="flex justify-between">
                   <span className="text-gray-400">售价</span>
                   <span className="text-emerald-400 font-mono font-bold">
-                    ¥{selectedEntity.price.toFixed(0).toLocaleString()}
+                    ¥{formatMoney(selectedEntity.price)}
                   </span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-gray-400">月租金</span>
                   <span className="text-amber-400 font-mono">
-                    ¥{selectedEntity.rent.toFixed(0).toLocaleString()}
+                    ¥{formatMoney(selectedEntity.rent)}
                   </span>
                 </div>
               </div>
@@ -427,7 +437,7 @@ export function EntityDetail() {
 
         <div className="p-3 bg-slate-800/50 rounded-lg border border-slate-700">
           <div className="text-xs text-gray-500">
-            位置: ({selectedEntity.position.x}, {selectedEntity.position.y})
+            位置: ({(selectedEntity.position || fallbackPosition).x}, {(selectedEntity.position || fallbackPosition).y})
           </div>
           <div className="text-xs text-gray-500 mt-1">
             ID: {selectedEntity.id}
