@@ -10,7 +10,7 @@ export function useGameSocket() {
   const setError = useGameStore(state => state.setError);
 
   useEffect(() => {
-    const socket = io('http://localhost:3001', {
+    const socket = io('http://localhost:1037', {
       transports: ['websocket', 'polling'],
     });
 

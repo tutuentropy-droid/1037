@@ -1,4 +1,4 @@
-import { useCallback } from 'react';
+import { useCallback, useState } from 'react';
 import { useGameStore } from '@/store/gameStore';
 import { Play, Pause, SkipForward, FastForward, Wifi, WifiOff } from 'lucide-react';
 import './TimeControl.css';
@@ -9,6 +9,13 @@ export function TimeControl() {
   const error = useGameStore(state => state.error);
   const setControl = useGameStore(state => state.setControl);
   const step = useGameStore(state => state.step);
+  const [speedTip, setSpeedTip] = useState<string | null>(null);
+
+  const speedDescriptions: Record<number, string> = {
+    1: '正常速度 (2秒/天)',
+    2: '快速 (1秒/天)',
+    3: '极速 (0.67秒/天)',
+  };
 
   const handleTogglePlay = useCallback(() => {
     if (!state) return;
@@ -22,6 +29,8 @@ export function TimeControl() {
   const handleSpeedChange = useCallback((speed: number) => {
     if (!state) return;
     setControl(state.isRunning, speed);
+    setSpeedTip(`已切换至 ${speed}x 速度 - ${speedDescriptions[speed]}`);
+    setTimeout(() => setSpeedTip(null), 2000);
   }, [state, setControl]);
 
   return (
@@ -95,7 +104,7 @@ export function TimeControl() {
           </div>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 relative">
           <span className="text-xs text-gray-400">速度:</span>
           <div className="flex gap-1">
             {[1, 2, 3].map((speed) => (
@@ -103,10 +112,11 @@ export function TimeControl() {
                 key={speed}
                 onClick={() => handleSpeedChange(speed)}
                 disabled={!isConnected}
+                title={speedDescriptions[speed]}
                 className={`
                   px-3 py-1 rounded-lg text-sm font-medium transition-all duration-200
                   ${state?.speed === speed
-                    ? 'bg-orange-500 text-white'
+                    ? 'bg-orange-500 text-white shadow-lg shadow-orange-500/30'
                     : 'bg-slate-700/50 text-gray-400 hover:bg-slate-600/50 hover:text-white'
                   }
                   disabled:opacity-50 disabled:cursor-not-allowed
@@ -117,6 +127,14 @@ export function TimeControl() {
               </button>
             ))}
           </div>
+          <span className="text-xs text-orange-400 ml-2 font-medium" style={{ fontFamily: "'VT323', monospace" }}>
+            [{state?.speed ? speedDescriptions[state.speed] : ''}]
+          </span>
+          {speedTip && (
+            <div className="absolute -bottom-10 right-0 px-3 py-1.5 bg-emerald-600 text-white text-xs rounded-lg shadow-lg animate-fade-in whitespace-nowrap z-50 border border-emerald-400">
+              ✓ {speedTip}
+            </div>
+          )}
         </div>
       </div>
     </div>

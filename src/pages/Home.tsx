@@ -9,28 +9,28 @@ export default function Home() {
   useGameSocket();
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 flex flex-col">
+    <div className="min-h-screen min-w-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 flex flex-col">
       <TimeControl />
       
-      <div className="flex-1 p-6 flex gap-6 overflow-hidden">
-        <div className="w-80 flex-shrink-0 flex flex-col gap-6">
-          <div className="p-5 bg-slate-800/30 rounded-2xl border border-slate-700 flex-1">
+      <div className="flex-1 p-4 flex gap-4 min-w-0">
+        <div className="w-60 flex-shrink-0 flex flex-col gap-4">
+          <div className="p-4 bg-slate-800/30 rounded-2xl border border-slate-700 flex-shrink-0">
             <ControlPanel />
           </div>
         </div>
 
-        <div className="flex-1 flex flex-col gap-6 min-w-0">
-          <div className="p-5 bg-slate-800/30 rounded-2xl border border-slate-700">
+        <div className="flex-1 flex flex-col gap-4 min-w-[680px]">
+          <div className="p-4 bg-slate-800/30 rounded-2xl border border-slate-700 flex-shrink-0">
             <StatsPanel />
           </div>
           
-          <div className="flex-1 p-5 bg-slate-800/30 rounded-2xl border border-slate-700 overflow-hidden min-h-0">
+          <div className="flex-1 p-4 bg-slate-800/30 rounded-2xl border border-slate-700 flex flex-col min-h-[720px]">
             <CityView />
           </div>
         </div>
 
-        <div className="w-80 flex-shrink-0">
-          <div className="p-5 bg-slate-800/30 rounded-2xl border border-slate-700 h-full">
+        <div className="w-60 flex-shrink-0">
+          <div className="p-4 bg-slate-800/30 rounded-2xl border border-slate-700 min-h-full">
             <EntityDetail />
           </div>
         </div>

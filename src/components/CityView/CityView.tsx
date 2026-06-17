@@ -87,8 +87,8 @@ export function CityView() {
   };
 
   return (
-    <div className="city-view-container flex flex-col h-full">
-      <div className="flex items-center justify-between mb-4">
+    <div className="city-view-container flex flex-col h-full min-h-[680px]">
+      <div className="flex items-center justify-between mb-4 flex-shrink-0">
         <h2 className="text-xl font-bold text-white" style={{ fontFamily: "'Press Start 2P', cursive", fontSize: '14px' }}>
           🏙️ 城市视图
         </h2>
@@ -108,7 +108,7 @@ export function CityView() {
         </div>
       </div>
 
-      <div className="legend flex gap-6 mb-4 text-xs">
+      <div className="legend flex flex-wrap gap-4 mb-4 text-xs flex-shrink-0">
         <div className="flex items-center gap-2">
           <div className="w-4 h-4 bg-purple-500/80 border border-purple-400 rounded"></div>
           <span className="text-gray-300">企业</span>
@@ -127,26 +127,30 @@ export function CityView() {
         </div>
       </div>
 
-      <div 
-        className="city-grid relative bg-slate-800/50 rounded-lg border-2 border-slate-700 overflow-hidden flex-1"
-        style={{ 
-          width: `${containerSize}px`, 
-          height: `${containerSize}px`,
-          backgroundImage: `
-            linear-gradient(rgba(100, 116, 139, 0.1) 1px, transparent 1px),
-            linear-gradient(90deg, rgba(100, 116, 139, 0.1) 1px, transparent 1px)
-          `,
-          backgroundSize: `${pixelSize}px ${pixelSize}px`,
-        }}
-      >
-        {state?.entities.map(entity => (
-          <EntityTile
-            key={entity.id}
-            entity={entity}
-            isSelected={selectedEntity?.id === entity.id}
-            onClick={() => handleEntityClick(entity)}
-          />
-        ))}
+      <div className="flex-1 overflow-auto min-h-0 w-full">
+        <div className="flex justify-center items-start min-w-full p-2">
+          <div 
+            className="city-grid relative bg-slate-800/50 rounded-lg border-2 border-slate-700 flex-shrink-0"
+            style={{ 
+              width: `${containerSize}px`, 
+              height: `${containerSize}px`,
+              backgroundImage: `
+                linear-gradient(rgba(100, 116, 139, 0.1) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(100, 116, 139, 0.1) 1px, transparent 1px)
+              `,
+              backgroundSize: `${pixelSize}px ${pixelSize}px`,
+            }}
+          >
+            {state?.entities.map(entity => (
+              <EntityTile
+                key={entity.id}
+                entity={entity}
+                isSelected={selectedEntity?.id === entity.id}
+                onClick={() => handleEntityClick(entity)}
+              />
+            ))}
+          </div>
+        </div>
       </div>
     </div>
   );

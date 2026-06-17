@@ -4,7 +4,7 @@ import app from './app.js';
 import { gameStateManager } from './models/GameStateManager.js';
 import type { EconomicParams } from '../shared/index.js';
 
-const PORT = process.env.PORT || 3001;
+const PORT = process.env.PORT || 1037;
 
 const httpServer = createServer(app);
 
@@ -63,6 +63,11 @@ io.on('connection', (socket) => {
       startGameLoop();
     } else {
       stopGameLoop();
+    }
+
+    const currentState = gameStateManager.getState();
+    if (data.speed !== undefined && currentState.isRunning) {
+      startGameLoop();
     }
     
     broadcastState();
