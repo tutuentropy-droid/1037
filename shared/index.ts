@@ -2,9 +2,10 @@ export interface EconomicParams {
   taxRate: number;
   minimumWage: number;
   consumptionTax: number;
+  interestRate: number;
 }
 
-export type EntityType = 'resident' | 'shop' | 'enterprise';
+export type EntityType = 'resident' | 'shop' | 'enterprise' | 'house';
 
 export type PersonalityType = 'frugal' | 'consumer' | 'speculator' | 'layabout';
 
@@ -100,6 +101,8 @@ export interface ResidentHistoryEntry {
   event?: string;
 }
 
+export type ResidentActivity = 'idle' | 'working' | 'shopping' | 'home';
+
 export interface Resident {
   id: string;
   type: 'resident';
@@ -114,6 +117,11 @@ export interface Resident {
   mood: number;
   personality: PersonalityInfo;
   position: { x: number; y: number };
+  homePosition: { x: number; y: number };
+  targetPosition: { x: number; y: number } | null;
+  activity: ResidentActivity;
+  ownedHouseId: string | null;
+  rentedHouseId: string | null;
   history: ResidentHistoryEntry[];
 }
 
@@ -140,9 +148,37 @@ export interface Enterprise {
   production: number;
   position: { x: number; y: number };
   revenueHistory: number[];
+  landHoldings: number;
+  landValue: number;
 }
 
-export type Entity = Resident | Shop | Enterprise;
+export type HouseStatus = 'empty' | 'owned' | 'rented';
+export type HouseOwnerType = 'resident' | 'enterprise' | 'bank';
+
+export interface House {
+  id: string;
+  type: 'house';
+  name: string;
+  price: number;
+  rent: number;
+  status: HouseStatus;
+  ownerType: HouseOwnerType | null;
+  ownerId: string | null;
+  tenantId: string | null;
+  position: { x: number; y: number };
+  priceHistory: number[];
+}
+
+export type Entity = Resident | Shop | Enterprise | House;
+
+export interface HousingStats {
+  avgHousePrice: number;
+  avgRent: number;
+  vacancyRate: number;
+  homeownershipRate: number;
+  totalHouses: number;
+  priceChange: number;
+}
 
 export interface EconomicStats {
   gdp: number;
@@ -153,6 +189,9 @@ export interface EconomicStats {
   priceChange: number;
   totalPopulation: number;
   employedPopulation: number;
+  housing: HousingStats;
+  totalLoans: number;
+  avgInterestRate: number;
 }
 
 export interface GameState {
@@ -176,12 +215,14 @@ export const DEFAULT_PARAMS: EconomicParams = {
   taxRate: 0.2,
   minimumWage: 2000,
   consumptionTax: 0.1,
+  interestRate: 0.05,
 };
 
 export const GAME_CONFIG = {
   INITIAL_RESIDENTS: 100,
   INITIAL_SHOPS: 10,
   INITIAL_ENTERPRISES: 5,
+  INITIAL_HOUSES: 80,
   CONSUMPTION_RATE: 0.8,
   UNEMPLOYMENT_BENEFIT: 500,
   LAYOFF_THRESHOLD_DAYS: 3,
@@ -190,7 +231,10 @@ export const GAME_CONFIG = {
   MAX_HISTORY_ENTRIES: 30,
   MAX_EVENTS: 100,
   HOUSE_PRICE: 50000,
+  HOUSE_RENT_RATIO: 0.01,
   INVESTMENT_RETURN_RATE: 0.08,
   INVESTMENT_RISK: 0.3,
   DEBT_INTEREST_RATE: 0.005,
+  LAND_SPECULATION_PROFIT_THRESHOLD: 0.3,
+  LOAN_MAX_INCOME_RATIO: 5,
 };

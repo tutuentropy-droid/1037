@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
 import { useGameStore } from '@/store/gameStore';
-import { TrendingUp, TrendingDown, Minus, DollarSign, Users, ShoppingCart, Heart } from 'lucide-react';
+import { TrendingUp, TrendingDown, Minus, DollarSign, Users, ShoppingCart, Heart, Home, Banknote, Building2 } from 'lucide-react';
 import { PERSONALITIES } from '@shared/index';
 import type { Resident, PersonalityType } from '@shared/index';
 import './StatsPanel.css';
@@ -122,6 +122,30 @@ export function StatsPanel() {
         color: 'text-cyan-400',
         bgColor: 'bg-slate-800/50 border-cyan-500/30',
       },
+      {
+        title: '平均房价',
+        value: `¥${formatNumber(stats.housing.avgHousePrice)}`,
+        change: stats.housing.priceChange,
+        icon: <Home className="w-5 h-5 text-violet-400" />,
+        color: 'text-violet-400',
+        bgColor: 'bg-slate-800/50 border-violet-500/30',
+      },
+      {
+        title: '房屋空置率',
+        value: `${(stats.housing.vacancyRate * 100).toFixed(1)}%`,
+        change: 0,
+        icon: <Building2 className="w-5 h-5 text-orange-400" />,
+        color: 'text-orange-400',
+        bgColor: 'bg-slate-800/50 border-orange-500/30',
+      },
+      {
+        title: '贷款总额',
+        value: `¥${formatNumber(stats.totalLoans)}`,
+        change: 0,
+        icon: <Banknote className="w-5 h-5 text-emerald-400" />,
+        color: 'text-emerald-400',
+        bgColor: 'bg-slate-800/50 border-emerald-500/30',
+      },
     ];
   }, [stats]);
 
@@ -136,7 +160,7 @@ export function StatsPanel() {
   return (
     <div className="stats-panel">
       <div className="grid grid-cols-3 gap-4">
-        {formattedStats?.map((stat, index) => (
+        {formattedStats?.map((stat) => (
           <StatCard key={stat.title} {...stat} />
         ))}
       </div>
@@ -158,6 +182,39 @@ export function StatsPanel() {
             style={{ fontFamily: "'VT323', monospace" }}
           >
             {stats.employedPopulation} 人
+          </div>
+        </div>
+      </div>
+
+      <div className="mt-4 p-3 bg-slate-800/30 rounded-lg border border-slate-700">
+        <div className="flex items-center gap-2 text-xs text-gray-400 mb-3">
+          <Home className="w-3.5 h-3.5 text-violet-400" />
+          房地产市场
+        </div>
+        <div className="grid grid-cols-2 gap-2">
+          <div>
+            <div className="text-xs text-gray-500">平均租金</div>
+            <div className="text-sm font-bold text-white tabular-nums" style={{ fontFamily: "'VT323', monospace" }}>
+              ¥{stats?.housing?.avgRent ? stats.housing.avgRent.toFixed(0) : '0'}
+            </div>
+          </div>
+          <div>
+            <div className="text-xs text-gray-500">住房拥有率</div>
+            <div className="text-sm font-bold text-white tabular-nums" style={{ fontFamily: "'VT323', monospace" }}>
+              {stats?.housing ? (stats.housing.homeownershipRate * 100).toFixed(1) : '0'}%
+            </div>
+          </div>
+          <div>
+            <div className="text-xs text-gray-500">房屋总数</div>
+            <div className="text-sm font-bold text-white tabular-nums" style={{ fontFamily: "'VT323', monospace" }}>
+              {stats?.housing?.totalHouses || 0} 套
+            </div>
+          </div>
+          <div>
+            <div className="text-xs text-gray-500">基准利率</div>
+            <div className="text-sm font-bold text-white tabular-nums" style={{ fontFamily: "'VT323', monospace" }}>
+              {stats?.avgInterestRate ? (stats.avgInterestRate * 100).toFixed(1) : '0'}%
+            </div>
           </div>
         </div>
       </div>

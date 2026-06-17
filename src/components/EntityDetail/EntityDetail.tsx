@@ -1,6 +1,6 @@
 import { useGameStore } from '@/store/gameStore';
-import type { Resident, Shop, Enterprise, ResidentHistoryEntry } from '@shared/index';
-import { X, Building2, ShoppingBag, User, Briefcase, Wallet, TrendingUp, Users, Heart, TrendingDown, PiggyBank, CreditCard, Home, Smile, Frown, Meh, Activity } from 'lucide-react';
+import type { ResidentHistoryEntry } from '@shared/index';
+import { X, Building2, ShoppingBag, User, Briefcase, Wallet, TrendingUp, Users, Heart, PiggyBank, CreditCard, Home, Smile, Frown, Meh, Activity, Building } from 'lucide-react';
 import './EntityDetail.css';
 
 export function EntityDetail() {
@@ -25,18 +25,23 @@ export function EntityDetail() {
     if (selectedEntity.type === 'shop') {
       return <ShoppingBag className="w-6 h-6 text-amber-400" />;
     }
+    if (selectedEntity.type === 'house') {
+      return <Home className="w-6 h-6 text-violet-400" />;
+    }
     return <User className="w-6 h-6 text-emerald-400" />;
   };
 
   const getTypeLabel = () => {
     if (selectedEntity.type === 'enterprise') return '企业';
     if (selectedEntity.type === 'shop') return '商店';
+    if (selectedEntity.type === 'house') return '房屋';
     return '居民';
   };
 
   const getTypeColor = () => {
     if (selectedEntity.type === 'enterprise') return 'text-purple-400 border-purple-500/30';
     if (selectedEntity.type === 'shop') return 'text-amber-400 border-amber-500/30';
+    if (selectedEntity.type === 'house') return 'text-violet-400 border-violet-500/30';
     return selectedEntity.employed ? 'text-emerald-400 border-emerald-500/30' : 'text-rose-400 border-rose-500/30';
   };
 
@@ -314,7 +319,110 @@ export function EntityDetail() {
                 日产量 ¥{selectedEntity.production.toFixed(0).toLocaleString()}
               </div>
             </div>
+
+            {(selectedEntity.landHoldings || 0) > 0 && (
+              <div className="p-3 bg-slate-800/50 rounded-lg border border-slate-700">
+                <div className="flex items-center gap-2 text-gray-400 text-sm mb-2">
+                  <Building className="w-4 h-4" />
+                  土地储备
+                </div>
+                <div className="text-lg font-bold text-violet-400">
+                  {selectedEntity.landHoldings} 套房产
+                </div>
+                <div className="text-xs text-gray-500 mt-1">
+                  估值 ¥{selectedEntity.landValue?.toFixed(0).toLocaleString() || '0'}
+                </div>
+              </div>
+            )}
           </>
+        )}
+
+        {selectedEntity.type === 'house' && (
+          <>
+            <div className="p-3 bg-slate-800/50 rounded-lg border border-slate-700">
+              <div className="flex items-center gap-2 text-gray-400 text-sm mb-2">
+                <Home className="w-4 h-4" />
+                房屋状态
+              </div>
+              <div className={`text-lg font-bold ${
+                selectedEntity.status === 'owned' ? 'text-emerald-400' :
+                selectedEntity.status === 'rented' ? 'text-amber-400' :
+                'text-gray-400'
+              }`}>
+                {selectedEntity.status === 'owned' ? '🏠 自有住房' :
+                 selectedEntity.status === 'rented' ? '🏘️ 已出租' :
+                 '🏚️ 空置中'}
+              </div>
+              {selectedEntity.ownerType && (
+                <div className="text-xs text-gray-500 mt-1">
+                  所有者: {selectedEntity.ownerType === 'resident' ? '居民' : 
+                          selectedEntity.ownerType === 'enterprise' ? '企业' : '银行'}
+                </div>
+              )}
+            </div>
+
+            <div className="p-3 bg-slate-800/50 rounded-lg border border-slate-700">
+              <div className="flex items-center gap-2 text-gray-400 text-sm mb-2">
+                <TrendingUp className="w-4 h-4" />
+                价格信息
+              </div>
+              <div className="space-y-2">
+                <div className="flex justify-between">
+                  <span className="text-gray-400">售价</span>
+                  <span className="text-emerald-400 font-mono font-bold">
+                    ¥{selectedEntity.price.toFixed(0).toLocaleString()}
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-400">月租金</span>
+                  <span className="text-amber-400 font-mono">
+                    ¥{selectedEntity.rent.toFixed(0).toLocaleString()}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {selectedEntity.priceHistory && selectedEntity.priceHistory.length > 1 && (
+              <div className="p-3 bg-slate-800/50 rounded-lg border border-slate-700">
+                <div className="flex items-center gap-2 text-gray-400 text-sm mb-2">
+                  <Activity className="w-4 h-4" />
+                  价格走势
+                </div>
+                <div className="flex items-end gap-0.5 h-16">
+                  {selectedEntity.priceHistory.slice(-20).map((price: number, i: number) => {
+                    const max = Math.max(...selectedEntity.priceHistory.slice(-20));
+                    const min = Math.min(...selectedEntity.priceHistory.slice(-20));
+                    const range = max - min || 1;
+                    const height = ((price - min) / range) * 100;
+                    return (
+                      <div
+                        key={i}
+                        className="flex-1 bg-violet-500 rounded-t opacity-70"
+                        style={{ height: `${Math.max(10, height)}%` }}
+                        title={`¥${price.toFixed(0)}`}
+                      />
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+          </>
+        )}
+
+        {selectedEntity.type === 'resident' && (selectedEntity.ownedHouseId || selectedEntity.rentedHouseId) && (
+          <div className="p-3 bg-slate-800/50 rounded-lg border border-slate-700">
+            <div className="flex items-center gap-2 text-gray-400 text-sm mb-2">
+              <Home className="w-4 h-4" />
+              住房情况
+            </div>
+            <div className="text-sm">
+              {selectedEntity.ownedHouseId ? (
+                <span className="text-emerald-400">🏠 自有住房</span>
+              ) : selectedEntity.rentedHouseId ? (
+                <span className="text-amber-400">🏘️ 租住房屋</span>
+              ) : null}
+            </div>
+          </div>
         )}
 
         <div className="p-3 bg-slate-800/50 rounded-lg border border-slate-700">

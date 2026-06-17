@@ -58,6 +58,14 @@ export function updateGameParams(req: Request, res: Response) {
     });
   }
 
+  if (params.interestRate !== undefined && (params.interestRate < 0 || params.interestRate > 0.2)) {
+    return res.status(400).json({
+      success: false,
+      data: null,
+      message: '利率必须在 0-20% 之间',
+    });
+  }
+
   const state = gameStateManager.updateParams(params);
   const response: ApiResponse<typeof state.params> = {
     success: true,

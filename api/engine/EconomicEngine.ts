@@ -3,6 +3,7 @@ import type {
   Resident,
   Shop,
   Enterprise,
+  House,
   Entity,
   EconomicParams,
   EconomicStats,
@@ -34,6 +35,15 @@ function generateEnterpriseName(): string {
   const suffixes = ['企业', '公司', '集团', '工厂', '制造厂', '科技', '产业', '实业', '贸易', '股份'];
   return prefixes[Math.floor(Math.random() * prefixes.length)] + 
          suffixes[Math.floor(Math.random() * suffixes.length)];
+}
+
+function generateHouseName(): string {
+  const prefixes = ['阳光', '绿城', '金色', '锦绣', '幸福', '和谐', '美好', '安居', '祥和', '康乐'];
+  const suffixes = ['小区', '家园', '花园', '公寓', '大厦', '里', '苑', '阁', '庭', '府'];
+  const num = Math.floor(Math.random() * 100) + 1;
+  return prefixes[Math.floor(Math.random() * prefixes.length)] + 
+         suffixes[Math.floor(Math.random() * suffixes.length)] + 
+         ` ${num}号`;
 }
 
 function deepClone<T>(obj: T): T {
@@ -170,6 +180,8 @@ export function initializeGame(): GameState {
       production: 10000 + Math.random() * 5000,
       position: pos,
       revenueHistory: [],
+      landHoldings: 0,
+      landValue: 0,
     };
     entities.push(enterprise);
   }
@@ -191,12 +203,32 @@ export function initializeGame(): GameState {
     entities.push(shop);
   }
 
+  const houses: House[] = [];
+  for (let i = 0; i < GAME_CONFIG.INITIAL_HOUSES; i++) {
+    const pos = generateRandomPosition(positions, gridSize);
+    positions.push(pos);
+    const basePrice = GAME_CONFIG.HOUSE_PRICE * (0.8 + Math.random() * 0.4);
+    const house: House = {
+      id: generateId(),
+      type: 'house',
+      name: generateHouseName(),
+      price: basePrice,
+      rent: basePrice * GAME_CONFIG.HOUSE_RENT_RATIO,
+      status: 'empty',
+      ownerType: null,
+      ownerId: null,
+      tenantId: null,
+      position: pos,
+      priceHistory: [basePrice],
+    };
+    houses.push(house);
+    entities.push(house);
+  }
+
   const enterprises = entities.filter(e => e.type === 'enterprise') as Enterprise[];
   const residentList: Resident[] = [];
   
   for (let i = 0; i < GAME_CONFIG.INITIAL_RESIDENTS; i++) {
-    const pos = generateRandomPosition(positions, gridSize);
-    positions.push(pos);
     const personalityType = getRandomPersonality();
     const personality = { ...PERSONALITIES[personalityType] };
     
@@ -212,6 +244,25 @@ export function initializeGame(): GameState {
 
     const initialSavings = 5000 + Math.random() * 10000;
     
+    const assignedHouse = houses.find(h => h.status === 'empty');
+    let homePos = generateRandomPosition(positions, gridSize);
+    let ownedHouseId: string | null = null;
+    let rentedHouseId: string | null = null;
+
+    if (assignedHouse) {
+      homePos = assignedHouse.position;
+      if (initialSavings >= GAME_CONFIG.HOUSE_PRICE * 0.8 && Math.random() < 0.3) {
+        assignedHouse.status = 'owned';
+        assignedHouse.ownerType = 'resident';
+        assignedHouse.ownerId = '';
+        ownedHouseId = assignedHouse.id;
+      } else {
+        assignedHouse.status = 'rented';
+        assignedHouse.tenantId = '';
+        rentedHouseId = assignedHouse.id;
+      }
+    }
+    
     const resident: Resident = {
       id: generateId(),
       type: 'resident',
@@ -225,9 +276,29 @@ export function initializeGame(): GameState {
       assets: 0,
       mood: 50,
       personality,
-      position: pos,
+      position: { ...homePos },
+      homePosition: { ...homePos },
+      targetPosition: null,
+      activity: 'home',
+      ownedHouseId,
+      rentedHouseId,
       history: [],
     };
+    
+    if (ownedHouseId) {
+      const h = houses.find(hh => hh.id === ownedHouseId);
+      if (h) {
+        h.ownerId = resident.id;
+        resident.savings -= h.price;
+        resident.assets += h.price;
+      }
+    }
+    if (rentedHouseId) {
+      const h = houses.find(hh => hh.id === rentedHouseId);
+      if (h) {
+        h.tenantId = resident.id;
+      }
+    }
     
     resident.mood = calculateMood(resident);
     residentList.push(resident);
@@ -249,6 +320,16 @@ export function initializeGame(): GameState {
     priceChange: 0,
     totalPopulation: GAME_CONFIG.INITIAL_RESIDENTS,
     employedPopulation: GAME_CONFIG.INITIAL_RESIDENTS * 0.9,
+    housing: {
+      avgHousePrice: GAME_CONFIG.HOUSE_PRICE,
+      avgRent: GAME_CONFIG.HOUSE_PRICE * GAME_CONFIG.HOUSE_RENT_RATIO,
+      vacancyRate: 0,
+      homeownershipRate: 0.3,
+      totalHouses: GAME_CONFIG.INITIAL_HOUSES,
+      priceChange: 0,
+    },
+    totalLoans: 0,
+    avgInterestRate: DEFAULT_PARAMS.interestRate,
   };
 
   const state: GameState = {
@@ -293,6 +374,7 @@ function simulateConsumption(state: GameState): void {
   const shops = entities.filter(e => e.type === 'shop') as Shop[];
 
   const totalShopRevenue = shops.reduce((sum, s) => sum + Math.max(s.revenue, 1000), 0) || 1;
+  const interestEffect = 1 - params.interestRate * 3;
 
   residents.forEach(resident => {
     const personality = resident.personality;
@@ -302,7 +384,7 @@ function simulateConsumption(state: GameState): void {
     if (resident.employed) {
       const disposableIncome = resident.income * (1 - params.taxRate);
       const baseConsumption = disposableIncome * GAME_CONFIG.CONSUMPTION_RATE * (1 - params.consumptionTax);
-      consumptionAmount = baseConsumption * personality.consumptionMultiplier;
+      consumptionAmount = baseConsumption * personality.consumptionMultiplier * interestEffect;
 
       if (personality.type === 'consumer' && Math.random() < 0.3) {
         const overspend = consumptionAmount * 0.3;
@@ -415,13 +497,314 @@ function simulateInvestment(state: GameState): void {
   });
 }
 
+function simulateRentPayment(state: GameState): void {
+  const residents = state.entities.filter(e => e.type === 'resident') as Resident[];
+  const houses = state.entities.filter(e => e.type === 'house') as House[];
+
+  residents.forEach(resident => {
+    if (resident.rentedHouseId) {
+      const house = houses.find(h => h.id === resident.rentedHouseId);
+      if (house) {
+        resident.savings -= house.rent;
+        if (resident.savings < 0) {
+          resident.debt += Math.abs(resident.savings);
+          resident.savings = 0;
+        }
+        if (house.ownerType === 'resident' && house.ownerId) {
+          const owner = residents.find(r => r.id === house.ownerId);
+          if (owner) {
+            owner.savings += house.rent;
+          }
+        } else if (house.ownerType === 'enterprise') {
+          const enterprises = state.entities.filter(e => e.type === 'enterprise') as Enterprise[];
+          const owner = enterprises.find(e => e.id === house.ownerId);
+          if (owner) {
+            owner.revenue += house.rent;
+          }
+        }
+      }
+    }
+  });
+}
+
+function updateHousingPrices(state: GameState): void {
+  const houses = state.entities.filter(e => e.type === 'house') as House[];
+  const residents = state.entities.filter(e => e.type === 'resident') as Resident[];
+  const emptyHouses = houses.filter(h => h.status === 'empty');
+
+  const demandFactor = residents.length / Math.max(houses.length, 1);
+  const vacancyRate = emptyHouses.length / Math.max(houses.length, 1);
+  const priceMultiplier = 1 + (demandFactor - 1) * 0.05 - vacancyRate * 0.1;
+
+  houses.forEach(house => {
+    const newPrice = house.price * priceMultiplier * (0.98 + Math.random() * 0.04);
+    house.price = Math.max(GAME_CONFIG.HOUSE_PRICE * 0.3, newPrice);
+    house.rent = house.price * GAME_CONFIG.HOUSE_RENT_RATIO;
+    house.priceHistory.push(house.price);
+    if (house.priceHistory.length > 30) {
+      house.priceHistory.shift();
+    }
+  });
+}
+
+function simulateHousingMarket(state: GameState): void {
+  const houses = state.entities.filter(e => e.type === 'house') as House[];
+  const residents = state.entities.filter(e => e.type === 'resident') as Resident[];
+  const emptyHouses = houses.filter(h => h.status === 'empty');
+
+  residents.forEach(resident => {
+    const personality = resident.personality;
+
+    if (!resident.rentedHouseId && !resident.ownedHouseId) {
+      if (emptyHouses.length > 0) {
+        const house = emptyHouses[Math.floor(Math.random() * emptyHouses.length)];
+        const canAffordRent = resident.income > house.rent * 3 || resident.savings > house.rent * 6;
+        
+        if (canAffordRent) {
+          house.status = 'rented';
+          house.tenantId = resident.id;
+          resident.rentedHouseId = house.id;
+          resident.homePosition = { ...house.position };
+          const idx = emptyHouses.indexOf(house);
+          if (idx > -1) emptyHouses.splice(idx, 1);
+        }
+      }
+    }
+
+    if (resident.ownedHouseId) return;
+
+    const buyChance = personality.investmentChance * (personality.type === 'frugal' ? 2 : 1);
+    const canAffordHouse = resident.savings >= housePriceForResident(resident, houses) * 0.5;
+    
+    if (canAffordHouse && Math.random() < buyChance * 0.05) {
+      const availableHouse = emptyHouses.find(h => 
+        h.price <= resident.savings * 1.5 &&
+        h.price >= resident.savings * 0.3
+      );
+
+      if (availableHouse) {
+        if (resident.rentedHouseId) {
+          const oldHouse = houses.find(h => h.id === resident.rentedHouseId);
+          if (oldHouse) {
+            oldHouse.status = 'empty';
+            oldHouse.tenantId = null;
+            emptyHouses.push(oldHouse);
+          }
+          resident.rentedHouseId = null;
+        }
+
+        const loanNeeded = Math.max(0, availableHouse.price - resident.savings);
+        if (loanNeeded > 0 && state.params.interestRate < 0.15) {
+          const maxLoan = resident.income * GAME_CONFIG.LOAN_MAX_INCOME_RATIO;
+          if (loanNeeded <= maxLoan) {
+            resident.debt += loanNeeded;
+            resident.savings += loanNeeded;
+            addEvent(state, createEvent(
+              'debt_change',
+              `${resident.name} 申请房贷`,
+              `${resident.name} 申请了 ¥${loanNeeded.toFixed(0)} 的房贷，利率 ${(state.params.interestRate * 100).toFixed(1)}%`,
+              state.day,
+              'neutral',
+              resident.id,
+              resident.name,
+              loanNeeded
+            ));
+          } else {
+            return;
+          }
+        }
+
+        resident.savings -= availableHouse.price;
+        resident.assets += availableHouse.price;
+        resident.ownedHouseId = availableHouse.id;
+        resident.homePosition = { ...availableHouse.position };
+        availableHouse.status = 'owned';
+        availableHouse.ownerType = 'resident';
+        availableHouse.ownerId = resident.id;
+        availableHouse.tenantId = null;
+
+        const idx = emptyHouses.indexOf(availableHouse);
+        if (idx > -1) emptyHouses.splice(idx, 1);
+
+        addEvent(state, createEvent(
+          'asset_purchase',
+          `${resident.name} 购房`,
+          `${resident.name} 以 ¥${availableHouse.price.toFixed(0)} 购买了 ${availableHouse.name}`,
+          state.day,
+          'positive',
+          resident.id,
+          resident.name,
+          availableHouse.price
+        ));
+      }
+    }
+
+    if (resident.rentedHouseId && resident.savings < 0 && resident.debt > resident.income * 6) {
+      const house = houses.find(h => h.id === resident.rentedHouseId);
+      if (house) {
+        house.status = 'empty';
+        house.tenantId = null;
+        resident.rentedHouseId = null;
+        emptyHouses.push(house);
+        addEvent(state, createEvent(
+          'job_change',
+          `${resident.name} 退租`,
+          `${resident.name} 因经济困难退租了 ${house.name}`,
+          state.day,
+          'negative',
+          resident.id,
+          resident.name
+        ));
+      }
+    }
+  });
+
+  updateHousingPrices(state);
+}
+
+function housePriceForResident(resident: Resident, houses: House[]): number {
+  const avgPrice = houses.reduce((sum, h) => sum + h.price, 0) / Math.max(houses.length, 1);
+  const incomeFactor = resident.income / DEFAULT_PARAMS.minimumWage;
+  return avgPrice * (0.5 + incomeFactor * 0.3);
+}
+
+function simulateLandSpeculation(state: GameState): void {
+  const enterprises = state.entities.filter(e => e.type === 'enterprise') as Enterprise[];
+  const houses = state.entities.filter(e => e.type === 'house') as House[];
+  const emptyHouses = houses.filter(h => h.status === 'empty');
+
+  enterprises.forEach(enterprise => {
+    const profit = enterprise.revenue - enterprise.expenses;
+    const profitMargin = profit / Math.max(enterprise.revenue, 1);
+
+    if (profitMargin > GAME_CONFIG.LAND_SPECULATION_PROFIT_THRESHOLD && emptyHouses.length > 0) {
+      const speculationChance = (profitMargin - GAME_CONFIG.LAND_SPECULATION_PROFIT_THRESHOLD) * 2;
+      
+      if (Math.random() < speculationChance) {
+        const numHousesToBuy = Math.min(
+          Math.floor(profit / GAME_CONFIG.HOUSE_PRICE),
+          Math.floor(emptyHouses.length * 0.1) + 1
+        );
+
+        for (let i = 0; i < numHousesToBuy && emptyHouses.length > 0; i++) {
+          const house = emptyHouses[Math.floor(Math.random() * emptyHouses.length)];
+          
+          if (profit >= house.price) {
+            enterprise.expenses += house.price;
+            enterprise.landHoldings++;
+            enterprise.landValue += house.price;
+            house.status = 'rented';
+            house.ownerType = 'enterprise';
+            house.ownerId = enterprise.id;
+            
+            const idx = emptyHouses.indexOf(house);
+            if (idx > -1) emptyHouses.splice(idx, 1);
+          }
+        }
+
+        if (numHousesToBuy > 0) {
+          addEvent(state, createEvent(
+            'asset_purchase',
+            `${enterprise.name} 囤地炒房`,
+            `${enterprise.name} 购置了 ${numHousesToBuy} 套房产用于投机`,
+            state.day,
+            'neutral',
+            enterprise.id,
+            enterprise.name
+          ));
+        }
+      }
+    }
+
+    if (enterprise.landHoldings > 0 && state.stats.housing?.priceChange > 2) {
+      const sellChance = state.stats.housing.priceChange * 0.1;
+      if (Math.random() < sellChance) {
+        const ownedHouses = houses.filter(
+          h => h.ownerType === 'enterprise' && h.ownerId === enterprise.id
+        );
+        
+        if (ownedHouses.length > 0) {
+          const houseToSell = ownedHouses[Math.floor(Math.random() * ownedHouses.length)];
+          enterprise.revenue += houseToSell.price;
+          enterprise.landHoldings--;
+          enterprise.landValue -= houseToSell.price;
+          houseToSell.status = 'empty';
+          houseToSell.ownerType = null;
+          houseToSell.ownerId = null;
+          houseToSell.tenantId = null;
+          emptyHouses.push(houseToSell);
+
+          addEvent(state, createEvent(
+            'asset_sale',
+            `${enterprise.name} 抛售房产`,
+            `${enterprise.name} 以 ¥${houseToSell.price.toFixed(0)} 抛售了一套房产`,
+            state.day,
+            'positive',
+            enterprise.id,
+            enterprise.name,
+            houseToSell.price
+          ));
+        }
+      }
+    }
+  });
+}
+
+function simulateBankLoans(state: GameState): void {
+  const residents = state.entities.filter(e => e.type === 'resident') as Resident[];
+  const interestRate = state.params.interestRate;
+
+  residents.forEach(resident => {
+    if (resident.debt > 0 && resident.savings > resident.debt * 0.5) {
+      const repayChance = 0.1 * (1 - interestRate * 10);
+      if (Math.random() < Math.max(0.01, repayChance)) {
+        const repayAmount = Math.min(resident.savings * 0.3, resident.debt);
+        resident.savings -= repayAmount;
+        resident.debt -= repayAmount;
+        
+        addEvent(state, createEvent(
+          'debt_change',
+          `${resident.name} 偿还贷款`,
+          `${resident.name} 偿还了 ¥${repayAmount.toFixed(0)} 的贷款`,
+          state.day,
+          'positive',
+          resident.id,
+          resident.name,
+          repayAmount
+        ));
+      }
+    }
+
+    if (resident.debt === 0 && resident.employed) {
+      const loanDemand = (1 - interestRate * 10) * resident.personality.consumptionMultiplier * 0.02;
+      if (Math.random() < Math.max(0, loanDemand)) {
+        const loanAmount = resident.income * (0.5 + Math.random() * 1.5);
+        resident.savings += loanAmount;
+        resident.debt += loanAmount;
+        
+        addEvent(state, createEvent(
+          'debt_change',
+          `${resident.name} 申请消费贷`,
+          `${resident.name} 申请了 ¥${loanAmount.toFixed(0)} 的消费贷款，利率 ${(interestRate * 100).toFixed(1)}%`,
+          state.day,
+          'neutral',
+          resident.id,
+          resident.name,
+          loanAmount
+        ));
+      }
+    }
+  });
+}
+
 function simulateDebtInterest(state: GameState): void {
   const residents = state.entities.filter(e => e.type === 'resident') as Resident[];
+  const interestRate = state.params.interestRate;
 
   residents.forEach(resident => {
     if (resident.debt > 0) {
-      const interest = resident.debt * GAME_CONFIG.DEBT_INTEREST_RATE;
-      resident.debt += interest;
+      const dailyInterest = resident.debt * interestRate / 30;
+      resident.debt += dailyInterest;
       
       if (resident.savings >= resident.debt && resident.personality.type !== 'consumer') {
         if (Math.random() < 0.3) {
@@ -678,6 +1061,7 @@ function calculateEconomicStats(state: GameState): void {
   const residents = entities.filter(e => e.type === 'resident') as Resident[];
   const shops = entities.filter(e => e.type === 'shop') as Shop[];
   const enterprises = entities.filter(e => e.type === 'enterprise') as Enterprise[];
+  const houses = entities.filter(e => e.type === 'house') as House[];
 
   const totalConsumption = residents.reduce((sum, r) => sum + r.consumption, 0);
   const totalProduction = enterprises.reduce((sum, e) => sum + e.production, 0);
@@ -698,6 +1082,26 @@ function calculateEconomicStats(state: GameState): void {
     ? ((priceIndex - prevStats.priceIndex) / prevStats.priceIndex) * 100 
     : 0;
 
+  const avgHousePrice = houses.length > 0 
+    ? houses.reduce((sum, h) => sum + h.price, 0) / houses.length 
+    : GAME_CONFIG.HOUSE_PRICE;
+  const avgRent = houses.length > 0 
+    ? houses.reduce((sum, h) => sum + h.rent, 0) / houses.length 
+    : GAME_CONFIG.HOUSE_PRICE * GAME_CONFIG.HOUSE_RENT_RATIO;
+  const vacancyRate = houses.length > 0 
+    ? houses.filter(h => h.status === 'empty').length / houses.length 
+    : 0;
+  const homeownershipRate = residents.length > 0 
+    ? residents.filter(r => r.ownedHouseId).length / residents.length 
+    : 0;
+
+  const prevHousingPrice = prevStats?.housing?.avgHousePrice || avgHousePrice;
+  const housingPriceChange = prevHousingPrice > 0 
+    ? ((avgHousePrice - prevHousingPrice) / prevHousingPrice) * 100 
+    : 0;
+
+  const totalLoans = residents.reduce((sum, r) => sum + r.debt, 0);
+
   state.stats = {
     gdp,
     gdpChange,
@@ -707,6 +1111,16 @@ function calculateEconomicStats(state: GameState): void {
     priceChange,
     totalPopulation: residents.length,
     employedPopulation: residents.filter(r => r.employed).length,
+    housing: {
+      avgHousePrice,
+      avgRent,
+      vacancyRate,
+      homeownershipRate,
+      totalHouses: houses.length,
+      priceChange: housingPriceChange,
+    },
+    totalLoans,
+    avgInterestRate: state.params.interestRate,
   };
 }
 
@@ -715,8 +1129,12 @@ export function simulateDay(state: GameState): GameState {
   newState.day += 1;
 
   simulateWagePayment(newState);
+  simulateRentPayment(newState);
   simulateConsumption(newState);
   simulateInvestment(newState);
+  simulateBankLoans(newState);
+  simulateHousingMarket(newState);
+  simulateLandSpeculation(newState);
   simulateDebtInterest(newState);
   simulateProduction(newState);
   simulateHiringDecisions(newState);
