@@ -126,7 +126,7 @@ export function CityView() {
             {shops.length} 商店
           </span>
           <span className="text-emerald-400">
-            <Users className="inline w-4 h-4 mr-1" />
+            <User className="inline w-4 h-4 mr-1" />
             {residents.length} 居民
           </span>
         </div>
