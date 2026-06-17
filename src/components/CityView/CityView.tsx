@@ -1,8 +1,8 @@
 import { useMemo } from 'react';
 import { useGameStore } from '@/store/gameStore';
-import type { Entity } from '@shared/index';
-import { GAME_CONFIG } from '@shared/index';
-import { Building2, ShoppingBag, Users } from 'lucide-react';
+import type { Entity, Resident } from '@shared/index';
+import { GAME_CONFIG, PERSONALITIES } from '@shared/index';
+import { Building2, ShoppingBag, User } from 'lucide-react';
 import './CityView.css';
 
 interface EntityTileProps {
@@ -20,9 +20,25 @@ function EntityTile({ entity, isSelected, onClick }: EntityTileProps) {
       return 'bg-amber-500/80 border-amber-400';
     }
     if (entity.type === 'resident') {
-      return entity.employed 
-        ? 'bg-emerald-500/80 border-emerald-400' 
-        : 'bg-rose-500/80 border-rose-400';
+      const resident = entity as Resident;
+      const baseColor = resident.employed ? 'bg-emerald-500/70' : 'bg-rose-500/70';
+      let borderColor = 'border-emerald-400';
+      
+      switch (resident.personality.type) {
+        case 'frugal':
+          borderColor = resident.employed ? 'border-emerald-300' : 'border-emerald-600';
+          break;
+        case 'consumer':
+          borderColor = resident.employed ? 'border-pink-300' : 'border-pink-600';
+          break;
+        case 'speculator':
+          borderColor = resident.employed ? 'border-yellow-300' : 'border-yellow-600';
+          break;
+        case 'layabout':
+          borderColor = resident.employed ? 'border-slate-300' : 'border-slate-600';
+          break;
+      }
+      return `${baseColor} ${borderColor} border-2`;
     }
     return 'bg-gray-500/80 border-gray-400';
   };
@@ -34,7 +50,15 @@ function EntityTile({ entity, isSelected, onClick }: EntityTileProps) {
     if (entity.type === 'shop') {
       return <ShoppingBag className="w-4 h-4 text-white" />;
     }
-    return <Users className="w-4 h-4 text-white" />;
+    return <User className="w-3.5 h-3.5 text-white" />;
+  };
+
+  const getTitle = () => {
+    if (entity.type === 'resident') {
+      const resident = entity as Resident;
+      return `${resident.name} [${resident.personality.label}] ${resident.employed ? '✓' : '✗'}`;
+    }
+    return entity.name;
   };
 
   return (
@@ -47,13 +71,13 @@ function EntityTile({ entity, isSelected, onClick }: EntityTileProps) {
         hover:scale-105 hover:z-10
       `}
       style={{
-        width: '36px',
-        height: '36px',
-        left: `${entity.position.x * 40}px`,
-        top: `${entity.position.y * 40}px`,
+        width: '32px',
+        height: '32px',
+        left: `${entity.position.x * 40 + 4}px`,
+        top: `${entity.position.y * 40 + 4}px`,
       }}
       onClick={onClick}
-      title={entity.name}
+      title={getTitle()}
     >
       {getEntityIcon()}
     </div>
@@ -108,7 +132,7 @@ export function CityView() {
         </div>
       </div>
 
-      <div className="legend flex flex-wrap gap-4 mb-4 text-xs flex-shrink-0">
+      <div className="legend flex flex-wrap gap-3 mb-4 text-xs flex-shrink-0">
         <div className="flex items-center gap-2">
           <div className="w-4 h-4 bg-purple-500/80 border border-purple-400 rounded"></div>
           <span className="text-gray-300">企业</span>
@@ -117,13 +141,24 @@ export function CityView() {
           <div className="w-4 h-4 bg-amber-500/80 border border-amber-400 rounded"></div>
           <span className="text-gray-300">商店</span>
         </div>
-        <div className="flex items-center gap-2">
-          <div className="w-4 h-4 bg-emerald-500/80 border border-emerald-400 rounded"></div>
-          <span className="text-gray-300">就业居民</span>
+        <div className="flex items-center gap-2 ml-2">
+          <span className="text-gray-400">居民人格:</span>
         </div>
         <div className="flex items-center gap-2">
-          <div className="w-4 h-4 bg-rose-500/80 border border-rose-400 rounded"></div>
-          <span className="text-gray-300">失业居民</span>
+          <div className="w-4 h-4 bg-emerald-500/70 border-2 border-emerald-300 rounded"></div>
+          <span className="text-emerald-400">节俭型</span>
+        </div>
+        <div className="flex items-center gap-2">
+          <div className="w-4 h-4 bg-emerald-500/70 border-2 border-pink-300 rounded"></div>
+          <span className="text-pink-400">消费型</span>
+        </div>
+        <div className="flex items-center gap-2">
+          <div className="w-4 h-4 bg-emerald-500/70 border-2 border-yellow-300 rounded"></div>
+          <span className="text-yellow-400">投机型</span>
+        </div>
+        <div className="flex items-center gap-2">
+          <div className="w-4 h-4 bg-emerald-500/70 border-2 border-slate-300 rounded"></div>
+          <span className="text-slate-400">躺平型</span>
         </div>
       </div>
 

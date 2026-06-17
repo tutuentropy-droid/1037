@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { GameState, EconomicParams, Entity } from '@shared/index';
+import type { GameState, EconomicParams, Entity, EconomicEvent } from '@shared/index';
 import { DEFAULT_PARAMS } from '@shared/index';
 
 interface GameStore {
@@ -7,11 +7,13 @@ interface GameStore {
   selectedEntity: Entity | null;
   isConnected: boolean;
   error: string | null;
+  events: EconomicEvent[];
   
   setState: (state: GameState) => void;
   setSelectedEntity: (entity: Entity | null) => void;
   setConnected: (connected: boolean) => void;
   setError: (error: string | null) => void;
+  setEvents: (events: EconomicEvent[]) => void;
   
   updateParams: (params: Partial<EconomicParams>) => void;
   setControl: (isRunning: boolean, speed?: number) => void;
@@ -36,6 +38,7 @@ const initialGameState: GameState = {
   },
   entities: [],
   history: [],
+  events: [],
 };
 
 export const useGameStore = create<GameStore>((set, get) => ({
@@ -43,11 +46,13 @@ export const useGameStore = create<GameStore>((set, get) => ({
   selectedEntity: null,
   isConnected: false,
   error: null,
+  events: [],
 
-  setState: (state) => set({ state }),
+  setState: (state) => set({ state, events: state.events || [] }),
   setSelectedEntity: (entity) => set({ selectedEntity: entity }),
   setConnected: (connected) => set({ isConnected: connected }),
   setError: (error) => set({ error }),
+  setEvents: (events) => set({ events }),
 
   updateParams: (params) => {
     const socket = (window as any).gameSocket;

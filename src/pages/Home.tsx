@@ -4,6 +4,7 @@ import { CityView } from '@/components/CityView/CityView';
 import { ControlPanel } from '@/components/ControlPanel/ControlPanel';
 import { StatsPanel } from '@/components/StatsPanel/StatsPanel';
 import { EntityDetail } from '@/components/EntityDetail/EntityDetail';
+import { EventLog } from '@/components/EventLog/EventLog';
 
 export default function Home() {
   useGameSocket();
@@ -24,12 +25,18 @@ export default function Home() {
             <StatsPanel />
           </div>
           
-          <div className="flex-1 p-4 bg-slate-800/30 rounded-2xl border border-slate-700 flex flex-col min-h-[720px]">
-            <CityView />
+          <div className="flex-1 flex gap-4 min-h-[720px]">
+            <div className="flex-1 p-4 bg-slate-800/30 rounded-2xl border border-slate-700 flex flex-col min-w-0">
+              <CityView />
+            </div>
+
+            <div className="w-80 flex-shrink-0 p-4 bg-slate-800/30 rounded-2xl border border-slate-700 flex flex-col">
+              <EventLog />
+            </div>
           </div>
         </div>
 
-        <div className="w-60 flex-shrink-0">
+        <div className="w-64 flex-shrink-0">
           <div className="p-4 bg-slate-800/30 rounded-2xl border border-slate-700 min-h-full">
             <EntityDetail />
           </div>

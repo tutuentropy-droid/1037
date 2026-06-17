@@ -1,6 +1,8 @@
 import { useMemo } from 'react';
 import { useGameStore } from '@/store/gameStore';
-import { TrendingUp, TrendingDown, Minus, DollarSign, Users, ShoppingCart } from 'lucide-react';
+import { TrendingUp, TrendingDown, Minus, DollarSign, Users, ShoppingCart, Heart } from 'lucide-react';
+import { PERSONALITIES } from '@shared/index';
+import type { Resident, PersonalityType } from '@shared/index';
 import './StatsPanel.css';
 
 interface StatCardProps {
@@ -66,6 +68,21 @@ function StatCard({ title, value, change, icon, color, bgColor }: StatCardProps)
 export function StatsPanel() {
   const state = useGameStore(state => state.state);
   const stats = state?.stats;
+
+  const personalityCounts = useMemo(() => {
+    if (!state) return {} as Record<PersonalityType, number>;
+    const residents = state.entities.filter(e => e.type === 'resident') as Resident[];
+    const counts: Record<PersonalityType, number> = {
+      frugal: 0,
+      consumer: 0,
+      speculator: 0,
+      layabout: 0,
+    };
+    residents.forEach(r => {
+      counts[r.personality.type]++;
+    });
+    return counts;
+  }, [state]);
 
   const formattedStats = useMemo(() => {
     if (!stats) return null;
@@ -142,6 +159,35 @@ export function StatsPanel() {
           >
             {stats.employedPopulation} 人
           </div>
+        </div>
+      </div>
+
+      <div className="mt-4 p-3 bg-slate-800/30 rounded-lg border border-slate-700">
+        <div className="flex items-center gap-2 text-xs text-gray-400 mb-3">
+          <Heart className="w-3.5 h-3.5 text-rose-400" />
+          居民人格分布
+        </div>
+        <div className="grid grid-cols-2 gap-2">
+          {(Object.keys(PERSONALITIES) as PersonalityType[]).map(type => {
+            const personality = PERSONALITIES[type];
+            const count = personalityCounts[type] || 0;
+            const percentage = stats.totalPopulation > 0 ? (count / stats.totalPopulation) * 100 : 0;
+            const colorClass = personality.color.replace('text-', 'bg-');
+            return (
+              <div key={type} className="flex items-center justify-between">
+                <span className={`text-xs ${personality.color}`}>{personality.label}</span>
+                <div className="flex items-center gap-2">
+                  <div className="w-12 h-1.5 bg-slate-700 rounded-full overflow-hidden">
+                    <div 
+                      className={`h-full ${colorClass} transition-all duration-500`}
+                      style={{ width: `${percentage}%` }}
+                    />
+                  </div>
+                  <span className="text-xs text-gray-500 w-8 text-right">{count}</span>
+                </div>
+              </div>
+            );
+          })}
         </div>
       </div>
     </div>

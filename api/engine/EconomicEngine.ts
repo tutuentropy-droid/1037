@@ -6,8 +6,11 @@ import type {
   Entity,
   EconomicParams,
   EconomicStats,
+  EconomicEvent,
+  PersonalityType,
+  ResidentHistoryEntry,
 } from '../../shared/index.js';
-import { DEFAULT_PARAMS, GAME_CONFIG } from '../../shared/index.js';
+import { DEFAULT_PARAMS, GAME_CONFIG, PERSONALITIES } from '../../shared/index.js';
 
 function generateId(): string {
   return Math.random().toString(36).substring(2, 11);
@@ -46,6 +49,106 @@ function generateRandomPosition(existingPositions: { x: number; y: number }[], g
     attempts++;
   } while (existingPositions.some(p => p.x === x && p.y === y) && attempts < 100);
   return { x, y };
+}
+
+function getRandomPersonality(): PersonalityType {
+  const types: PersonalityType[] = ['frugal', 'consumer', 'speculator', 'layabout'];
+  const weights = [0.3, 0.3, 0.2, 0.2];
+  const rand = Math.random();
+  let cumulative = 0;
+  for (let i = 0; i < types.length; i++) {
+    cumulative += weights[i];
+    if (rand < cumulative) return types[i];
+  }
+  return 'frugal';
+}
+
+function createEvent(
+  type: EconomicEvent['type'],
+  title: string,
+  description: string,
+  day: number,
+  impact?: 'positive' | 'negative' | 'neutral',
+  entityId?: string,
+  entityName?: string,
+  amount?: number
+): EconomicEvent {
+  return {
+    id: generateId(),
+    type,
+    title,
+    description,
+    day,
+    timestamp: Date.now(),
+    impact,
+    entityId,
+    entityName,
+    amount,
+  };
+}
+
+function addEvent(state: GameState, event: EconomicEvent): void {
+  state.events.unshift(event);
+  if (state.events.length > GAME_CONFIG.MAX_EVENTS) {
+    state.events.pop();
+  }
+}
+
+function calculateMood(resident: Resident): number {
+  let mood = 50;
+
+  if (resident.employed) {
+    mood += 15;
+  } else {
+    mood -= 20;
+  }
+
+  if (resident.savings > 10000) {
+    mood += 10;
+  } else if (resident.savings < 1000) {
+    mood -= 10;
+  }
+
+  if (resident.debt > 0) {
+    mood -= Math.min(15, resident.debt / 5000);
+  }
+
+  if (resident.assets > 0) {
+    mood += Math.min(10, resident.assets / 50000);
+  }
+
+  if (resident.personality.type === 'layabout') {
+    if (!resident.employed) mood += 10;
+  }
+
+  if (resident.personality.type === 'consumer') {
+    if (resident.consumption > resident.income * 0.5) mood += 5;
+  }
+
+  if (resident.personality.type === 'frugal') {
+    if (resident.savings > resident.income * 6) mood += 5;
+  }
+
+  if (resident.personality.type === 'speculator') {
+    if (resident.assets > 0) mood += 8;
+  }
+
+  return Math.max(0, Math.min(100, mood));
+}
+
+function recordResidentHistory(resident: Resident, day: number, event?: string): void {
+  const entry: ResidentHistoryEntry = {
+    day,
+    income: resident.income,
+    savings: resident.savings,
+    debt: resident.debt,
+    mood: resident.mood,
+    event,
+  };
+  resident.history.push(entry);
+  if (resident.history.length > GAME_CONFIG.MAX_HISTORY_ENTRIES) {
+    resident.history.shift();
+  }
 }
 
 export function initializeGame(): GameState {
@@ -94,7 +197,10 @@ export function initializeGame(): GameState {
   for (let i = 0; i < GAME_CONFIG.INITIAL_RESIDENTS; i++) {
     const pos = generateRandomPosition(positions, gridSize);
     positions.push(pos);
-    const employed = Math.random() > 0.1;
+    const personalityType = getRandomPersonality();
+    const personality = { ...PERSONALITIES[personalityType] };
+    
+    const employed = Math.random() < 0.9 * personality.workMotivation;
     let employerId: string | null = null;
     let income = 0;
 
@@ -104,6 +210,8 @@ export function initializeGame(): GameState {
       income = DEFAULT_PARAMS.minimumWage + Math.random() * 1000;
     }
 
+    const initialSavings = 5000 + Math.random() * 10000;
+    
     const resident: Resident = {
       id: generateId(),
       type: 'resident',
@@ -111,10 +219,17 @@ export function initializeGame(): GameState {
       employed,
       employerId,
       income,
-      savings: 5000 + Math.random() * 10000,
+      savings: initialSavings,
       consumption: 0,
+      debt: 0,
+      assets: 0,
+      mood: 50,
+      personality,
       position: pos,
+      history: [],
     };
+    
+    resident.mood = calculateMood(resident);
     residentList.push(resident);
     entities.push(resident);
   }
@@ -144,6 +259,7 @@ export function initializeGame(): GameState {
     stats: initialStats,
     entities,
     history: [],
+    events: [],
   };
 
   calculateEconomicStats(state);
@@ -179,28 +295,165 @@ function simulateConsumption(state: GameState): void {
   const totalShopRevenue = shops.reduce((sum, s) => sum + Math.max(s.revenue, 1000), 0) || 1;
 
   residents.forEach(resident => {
+    const personality = resident.personality;
+    let consumptionAmount: number;
+    let eventToRecord: string | undefined;
+
     if (resident.employed) {
       const disposableIncome = resident.income * (1 - params.taxRate);
-      const consumptionAmount = disposableIncome * GAME_CONFIG.CONSUMPTION_RATE * (1 - params.consumptionTax);
-      resident.consumption = consumptionAmount;
-      resident.savings += disposableIncome - consumptionAmount;
+      const baseConsumption = disposableIncome * GAME_CONFIG.CONSUMPTION_RATE * (1 - params.consumptionTax);
+      consumptionAmount = baseConsumption * personality.consumptionMultiplier;
 
+      if (personality.type === 'consumer' && Math.random() < 0.3) {
+        const overspend = consumptionAmount * 0.3;
+        consumptionAmount += overspend;
+        if (resident.savings < consumptionAmount) {
+          const debtNeeded = consumptionAmount - resident.savings;
+          resident.debt += debtNeeded;
+          eventToRecord = `超前消费 ¥${debtNeeded.toFixed(0)}`;
+          addEvent(state, createEvent(
+            'debt_change',
+            `${resident.name} 超前消费`,
+            `${resident.name} 为了消费背负了 ¥${debtNeeded.toFixed(0)} 的债务`,
+            state.day,
+            'negative',
+            resident.id,
+            resident.name,
+            debtNeeded
+          ));
+        }
+      }
+
+      resident.consumption = consumptionAmount;
+      const savingsChange = disposableIncome - consumptionAmount;
+      resident.savings += savingsChange;
+    } else {
+      consumptionAmount = Math.min(resident.savings * 0.5, GAME_CONFIG.UNEMPLOYMENT_BENEFIT);
+      resident.consumption = consumptionAmount;
+      resident.savings -= consumptionAmount;
+
+      if (resident.savings < 0) {
+        resident.debt += Math.abs(resident.savings);
+        resident.savings = 0;
+      }
+    }
+
+    if (consumptionAmount > 0) {
       shops.forEach(shop => {
         const shopShare = Math.max(shop.revenue, 1000) / totalShopRevenue;
         const consumptionForShop = consumptionAmount * shopShare;
         shop.revenue += consumptionForShop * (1 + params.consumptionTax);
       });
-    } else {
-      const consumptionAmount = Math.min(resident.savings * 0.5, GAME_CONFIG.UNEMPLOYMENT_BENEFIT);
-      resident.consumption = consumptionAmount;
-      resident.savings -= consumptionAmount;
+    }
 
-      if (consumptionAmount > 0) {
-        shops.forEach(shop => {
-          const shopShare = Math.max(shop.revenue, 1000) / totalShopRevenue;
-          const consumptionForShop = consumptionAmount * shopShare;
-          shop.revenue += consumptionForShop * (1 + params.consumptionTax);
-        });
+    recordResidentHistory(resident, state.day, eventToRecord);
+  });
+}
+
+function simulateInvestment(state: GameState): void {
+  const residents = state.entities.filter(e => e.type === 'resident') as Resident[];
+
+  residents.forEach(resident => {
+    const personality = resident.personality;
+    
+    if (resident.savings < GAME_CONFIG.HOUSE_PRICE * 0.3) return;
+    if (Math.random() > personality.investmentChance * 0.1) return;
+
+    const investmentAmount = Math.min(resident.savings * 0.3, GAME_CONFIG.HOUSE_PRICE * 0.5);
+    
+    if (personality.type === 'speculator') {
+      const isGain = Math.random() > GAME_CONFIG.INVESTMENT_RISK;
+      
+      if (isGain) {
+        const gain = investmentAmount * GAME_CONFIG.INVESTMENT_RETURN_RATE * (1 + Math.random());
+        resident.savings += gain;
+        resident.assets += gain * 0.5;
+        addEvent(state, createEvent(
+          'investment_gain',
+          `${resident.name} 投资获利`,
+          `${resident.name} 的投资获得了 ¥${gain.toFixed(0)} 的收益`,
+          state.day,
+          'positive',
+          resident.id,
+          resident.name,
+          gain
+        ));
+      } else {
+        const loss = investmentAmount * GAME_CONFIG.INVESTMENT_RISK * (1 + Math.random());
+        resident.savings -= loss;
+        resident.assets = Math.max(0, resident.assets - loss * 0.3);
+        addEvent(state, createEvent(
+          'investment_loss',
+          `${resident.name} 投资亏损`,
+          `${resident.name} 的投资亏损了 ¥${loss.toFixed(0)}`,
+          state.day,
+          'negative',
+          resident.id,
+          resident.name,
+          loss
+        ));
+      }
+    }
+    
+    if (personality.type === 'frugal' && resident.savings >= GAME_CONFIG.HOUSE_PRICE * 0.8) {
+      if (Math.random() < 0.05) {
+        const houseCost = GAME_CONFIG.HOUSE_PRICE;
+        resident.savings -= houseCost;
+        resident.assets += houseCost;
+        addEvent(state, createEvent(
+          'asset_purchase',
+          `${resident.name} 购置房产`,
+          `${resident.name} 花费 ¥${houseCost.toFixed(0)} 购置了房产`,
+          state.day,
+          'positive',
+          resident.id,
+          resident.name,
+          houseCost
+        ));
+      }
+    }
+  });
+}
+
+function simulateDebtInterest(state: GameState): void {
+  const residents = state.entities.filter(e => e.type === 'resident') as Resident[];
+
+  residents.forEach(resident => {
+    if (resident.debt > 0) {
+      const interest = resident.debt * GAME_CONFIG.DEBT_INTEREST_RATE;
+      resident.debt += interest;
+      
+      if (resident.savings >= resident.debt && resident.personality.type !== 'consumer') {
+        if (Math.random() < 0.3) {
+          resident.savings -= resident.debt;
+          addEvent(state, createEvent(
+            'debt_change',
+            `${resident.name} 还清债务`,
+            `${resident.name} 还清了所有债务，共计 ¥${resident.debt.toFixed(0)}`,
+            state.day,
+            'positive',
+            resident.id,
+            resident.name,
+            resident.debt
+          ));
+          resident.debt = 0;
+        }
+      }
+
+      if (resident.debt > resident.income * 24 && resident.assets > 0) {
+        const assetSale = Math.min(resident.assets, resident.debt * 0.5);
+        resident.assets -= assetSale;
+        resident.debt -= assetSale;
+        addEvent(state, createEvent(
+          'bankruptcy',
+          `${resident.name} 被迫变卖资产`,
+          `${resident.name} 因债务过高被迫变卖价值 ¥${assetSale.toFixed(0)} 的资产`,
+          state.day,
+          'negative',
+          resident.id,
+          resident.name,
+          assetSale
+        ));
       }
     }
   });
@@ -240,6 +493,15 @@ function simulateHiringDecisions(state: GameState): void {
           resident.employed = false;
           resident.employerId = null;
           resident.income = 0;
+          addEvent(state, createEvent(
+            'job_change',
+            `${resident.name} 被裁员`,
+            `${resident.name} 失去了工作`,
+            state.day,
+            'negative',
+            resident.id,
+            resident.name
+          ));
         }
         enterprise.employeeCount--;
       }
@@ -250,12 +512,31 @@ function simulateHiringDecisions(state: GameState): void {
       const isGrowing = recent.every((val, i, arr) => i === 0 || val > arr[i - 1]);
       
       if (isGrowing && unemployedResidents.length > 0) {
-        const newHire = unemployedResidents.shift()!;
+        const motivatedResidents = unemployedResidents.filter(
+          r => Math.random() < r.personality.workMotivation
+        );
+        
+        const candidates = motivatedResidents.length > 0 ? motivatedResidents : unemployedResidents;
+        const newHire = candidates[Math.floor(Math.random() * candidates.length)];
+        
+        const idx = unemployedResidents.findIndex(r => r.id === newHire.id);
+        if (idx > -1) unemployedResidents.splice(idx, 1);
+        
         newHire.employed = true;
         newHire.employerId = enterprise.id;
         newHire.income = state.params.minimumWage;
         enterprise.employeeIds.push(newHire.id);
         enterprise.employeeCount++;
+        
+        addEvent(state, createEvent(
+          'job_change',
+          `${newHire.name} 找到工作`,
+          `${newHire.name} 入职 ${enterprise.name}`,
+          state.day,
+          'positive',
+          newHire.id,
+          newHire.name
+        ));
       }
     }
   });
@@ -324,6 +605,74 @@ function simulateTaxCollection(state: GameState): void {
   });
 }
 
+function simulateMoodChanges(state: GameState): void {
+  const residents = state.entities.filter(e => e.type === 'resident') as Resident[];
+
+  residents.forEach(resident => {
+    const oldMood = resident.mood;
+    const newMood = calculateMood(resident);
+    resident.mood = newMood;
+
+    if (Math.abs(newMood - oldMood) > 10) {
+      addEvent(state, createEvent(
+        'mood_change',
+        `${resident.name} 情绪${newMood > oldMood ? '好转' : '恶化'}`,
+        `${resident.name} 的情绪指数从 ${oldMood.toFixed(0)} 变为 ${newMood.toFixed(0)}`,
+        state.day,
+        newMood > oldMood ? 'positive' : 'negative',
+        resident.id,
+        resident.name
+      ));
+    }
+  });
+}
+
+function checkEconomicEvents(state: GameState): void {
+  const prevStats = state.history[state.history.length - 2];
+  
+  if (!prevStats) return;
+
+  if (state.stats.gdpChange > 5) {
+    addEvent(state, createEvent(
+      'economic_boom',
+      '经济繁荣',
+      `GDP 增长率达到 ${state.stats.gdpChange.toFixed(2)}%，经济蓬勃发展`,
+      state.day,
+      'positive'
+    ));
+  }
+
+  if (state.stats.gdpChange < -3) {
+    addEvent(state, createEvent(
+      'economic_recession',
+      '经济衰退',
+      `GDP 增长率为 ${state.stats.gdpChange.toFixed(2)}%，经济陷入衰退`,
+      state.day,
+      'negative'
+    ));
+  }
+
+  if (state.stats.priceChange > 3) {
+    addEvent(state, createEvent(
+      'inflation_warning',
+      '通胀预警',
+      `物价指数上涨 ${state.stats.priceChange.toFixed(2)}%，通胀压力加大`,
+      state.day,
+      'negative'
+    ));
+  }
+
+  if (state.stats.priceChange < -2) {
+    addEvent(state, createEvent(
+      'deflation_warning',
+      '通缩预警',
+      `物价指数下跌 ${Math.abs(state.stats.priceChange).toFixed(2)}%，存在通缩风险`,
+      state.day,
+      'negative'
+    ));
+  }
+}
+
 function calculateEconomicStats(state: GameState): void {
   const { entities } = state;
   const residents = entities.filter(e => e.type === 'resident') as Resident[];
@@ -367,11 +716,15 @@ export function simulateDay(state: GameState): GameState {
 
   simulateWagePayment(newState);
   simulateConsumption(newState);
+  simulateInvestment(newState);
+  simulateDebtInterest(newState);
   simulateProduction(newState);
   simulateHiringDecisions(newState);
   simulateShopOperations(newState);
   simulateTaxCollection(newState);
+  simulateMoodChanges(newState);
   calculateEconomicStats(newState);
+  checkEconomicEvents(newState);
 
   newState.history.push({ ...newState.stats });
   if (newState.history.length > 100) {
